@@ -10,6 +10,9 @@ Automatically generate helpful comments for your code using a **locally running 
 - 📄 **Single File or Batch**: Process individual files or entire directories
 - 🎯 **Smart Commenting**: Adds comments to functions, classes, and complex logic without over-commenting
 - ⚡ **Fast**: Runs on your hardware (GPU/CPU)
+- 🤖 **Auto Model Detection**: Automatically finds and uses the most powerful available LLM
+- ☁️ **Cloud Fallback**: Optional fallback to cloud APIs (OpenAI, etc.) if no local models available
+- 🎯 **Zero Configuration**: Just run it - auto-configures everything!
 
 ## Prerequisites
 
@@ -70,31 +73,79 @@ pip install -r requirements.txt
 
 3. The `config.json` file will be auto-created on first run with default settings for Ollama
 
+## How It Works
+
+The auto-commenter uses an intelligent priority system:
+
+```
+1. Detect local Ollama installation
+   ↓
+2. Find all available models
+   ↓
+3. Select the most powerful model (dolphin-mixtral > mistral > llama2, etc.)
+   ↓
+4. Use that model for commenting
+   ↓
+5. If no local models → Fall back to cloud API (if configured)
+```
+
+**No manual model selection needed!** The script automatically chooses the best option.
+
 ## Configuration
 
-The `config.json` file controls all settings:
+The `config.json` file controls all settings (but defaults work great!):
 
 ```json
 {
-  "llm_provider": "ollama",           // "ollama" or "llamacpp"
-  "api_endpoint": "http://localhost:11434",  // Local LLM endpoint
-  "model": "mistral",                 // Model name to use
-  "temperature": 0.3,                 // 0.0-1.0 (lower = more consistent)
-  "max_tokens": 2000,                 // Max response length
-  "supported_extensions": [...]       // File types to process
+  "llm_provider": "ollama",                    // Primary LLM provider
+  "api_endpoint": "http://localhost:11434",   // Local Ollama endpoint
+  "model": "auto",                            // Auto-detects best model
+  "temperature": 0.3,                         // 0.0-1.0 (lower = consistent)
+  "max_tokens": 2000,                         // Max response length
+  "cloud_api_key": "",                        // Optional: OpenAI API key for fallback
+  "cloud_model": "gpt-3.5-turbo",            // Cloud model to use if local unavailable
+  "supported_extensions": [...]               // File types to process
 }
 ```
 
+### Priority Order
+
+1. **Local Ollama** (Preferred - Private, Fast)
+   - Automatically detects installed models
+   - Selects the most powerful one
+   
+2. **Cloud API** (Fallback - Add API key to config.json)
+   - OpenAI, Anthropic, or other providers
+   - Only used if no local models available
+
+3. **Error** (No LLM available)
+   - Clear error message with setup instructions
+
 ## Usage
 
-### Step 1: Start your local LLM
+### Quick Start (3 steps!)
 
-**For Ollama:**
+**Step 1: Start Ollama**
 ```bash
 ollama serve
 ```
 
-### Step 2: In another terminal, use Auto Commenter
+**Step 2: In another terminal, run the script**
+```bash
+pipenv run python auto_commenter.py script.py
+```
+
+**Step 3: Done!** Your commented code is in `script_commented.py`
+
+The script automatically:
+- ✅ Connects to Ollama
+- ✅ Finds available models
+- ✅ Selects the best one
+- ✅ Generates comments
+
+**No configuration needed!**
+
+### Advanced Usage
 
 #### Using Pipenv (Recommended)
 
