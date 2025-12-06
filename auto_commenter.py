@@ -7,7 +7,7 @@ This script uses a local LLM (Ollama or LLaMA.cpp) to automatically generate com
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 import requests
 import json
 from config import Config
@@ -16,12 +16,95 @@ from config import Config
 class LocalLLMAnalyzer:
     """Analyzes code and generates comments using a local LLM."""
     
+    # Model rankings (higher = more powerful)
+    MODEL_RANKINGS = {
+        'dolphin-mixtral': 10,
+        'dolphin2.2-mistral': 9,
+        'mistral': 8,
+        'llama2': 7,
+        'neural-chat': 6,
+        'orca-mini': 5,
+        'vicuna': 4,
+        'default': 1,
+    }
+    
     def __init__(self, config: Config):
         """Initialize the code analyzer with local LLM configuration."""
         self.config = config
         self.api_endpoint = config.get_api_endpoint()
-        self.model = config.get_model()
-        self.verify_connection()
+        self.available_models = []
+        self.model = None
+        self.use_local = True
+        
+        # Try local LLM first
+        if self.verify_connection():
+            self.detect_available_models()
+            if self.available_models:
+                self.select_best_model()
+            else:
+                print("\n✗ No local models found")
+                print("  Try: ollama pull mistral")
+                sys.exit(1)
+        else:
+            # Fall back to cloud API if local not available
+            print("\n⚠ Could not connect to local Ollama")
+            self.try_cloud_api()
+    
+    def try_cloud_api(self) -> bool:
+        """Try to use cloud API if local LLM is not available."""
+        cloud_api_key = self.config.get_cloud_api_key()
+        
+        if cloud_api_key:
+            self.use_local = False
+            print("✓ Falling back to cloud API")
+            self.model = "gpt-3.5-turbo"  # or configured cloud model
+            return True
+        else:
+            print("✗ No cloud API key configured")
+            print("\nTo use cloud API, add your API key to config.json:")
+            print('  "cloud_api_key": "your-api-key-here"')
+            print("\nOr start Ollama locally:")
+            print("  ollama serve")
+            sys.exit(1)
+    
+    def detect_available_models(self) -> List[str]:
+        """Detect all available models on the local LLM."""
+        try:
+            response = requests.get(f"{self.api_endpoint}/api/tags", timeout=5)
+            if response.status_code == 200:
+                data = response.json()
+                models = data.get('models', [])
+                self.available_models = [m.get('name', '').split(':')[0] for m in models]
+                
+                if self.available_models:
+                    print(f"✓ Found {len(self.available_models)} model(s): {', '.join(self.available_models)}")
+                else:
+                    print("✗ No models found. Please download a model first: ollama pull mistral")
+                    sys.exit(1)
+                
+                return self.available_models
+        except Exception as e:
+            print(f"Error detecting models: {e}")
+            sys.exit(1)
+    
+    def select_best_model(self) -> str:
+        """Select the most powerful model from available options."""
+        if not self.available_models:
+            print("No models available")
+            sys.exit(1)
+        
+        # Sort models by their ranking
+        ranked_models = []
+        for model in self.available_models:
+            rank = self.MODEL_RANKINGS.get(model, 1)
+            ranked_models.append((model, rank))
+        
+        ranked_models.sort(key=lambda x: x[1], reverse=True)
+        best_model = ranked_models[0][0]
+        
+        print(f"✓ Selected model: {best_model} (most powerful available)")
+        self.model = best_model
+        return best_model
     
     def verify_connection(self) -> bool:
         """Verify connection to the local LLM."""
@@ -30,6 +113,9 @@ class LocalLLMAnalyzer:
             if response.status_code == 200:
                 print(f"✓ Connected to local LLM at {self.api_endpoint}")
                 return True
+            else:
+                print(f"✗ Ollama returned status {response.status_code}")
+                return False
         except Exception as e:
             print(f"✗ Error connecting to local LLM: {e}")
             print(f"  Make sure Ollama is running: ollama serve")
@@ -77,7 +163,14 @@ class LocalLLMAnalyzer:
         return extension_map.get(ext, 'Unknown')
     
     def generate_comments(self, code: str, language: str) -> str:
-        """Generate comments for code using local LLM."""
+        """Generate comments for code using local or cloud LLM."""
+        if self.use_local:
+            return self._generate_local(code, language)
+        else:
+            return self._generate_cloud(code, language)
+    
+    def _generate_local(self, code: str, language: str) -> str:
+        """Generate comments using local LLM via Ollama."""
         try:
             prompt = f"""You are an expert code commenter. Your task is to add helpful comments to the following {language} code.
 
@@ -118,6 +211,43 @@ Return ONLY the commented code, nothing else. Do not add markdown formatting or 
                 
         except Exception as e:
             print(f"Error generating comments with local LLM: {e}")
+            return code
+    
+    def _generate_cloud(self, code: str, language: str) -> str:
+        """Generate comments using cloud API (OpenAI, etc.)."""
+        try:
+            import openai
+            
+            api_key = self.config.get_cloud_api_key()
+            if not api_key:
+                print("No cloud API key configured")
+                return code
+            
+            openai.api_key = api_key
+            
+            prompt = f"""You are an expert code commenter. Add helpful comments to this {language} code:
+
+{code}
+
+Return ONLY the commented code, nothing else."""
+            
+            response = openai.ChatCompletion.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are an expert code commenter."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=self.config.get_temperature(),
+                max_tokens=self.config.get_max_tokens(),
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except ImportError:
+            print("OpenAI package not installed. Run: pip install openai")
+            return code
+        except Exception as e:
+            print(f"Error generating comments with cloud API: {e}")
             return code
     
     def process_file(self, input_file: str, output_file: Optional[str] = None) -> bool:
@@ -177,7 +307,7 @@ def main():
         print("  python auto_commenter.py ./src/")
         print("\nRequirements:")
         print("  - Ollama running locally: ollama serve")
-        print("  - Default model pulled: ollama pull mistral (or other model)")
+        print("  - At least one model downloaded: ollama pull mistral")
         sys.exit(1)
     
     input_path = sys.argv[1]
@@ -186,21 +316,8 @@ def main():
     # Load configuration
     config = Config()
     
-    # Verify configuration
-    api_endpoint = config.get_api_endpoint()
-    if not api_endpoint:
-        print("Error: No API endpoint configured")
-        sys.exit(1)
-    
+    # Create analyzer (handles connection, model detection, and selection)
     analyzer = LocalLLMAnalyzer(config)
-    
-    # Check connection to local LLM
-    if not analyzer.verify_connection():
-        print("\nMake sure you have Ollama installed and running:")
-        print("  1. Download Ollama: https://ollama.ai")
-        print("  2. Run: ollama serve")
-        print("  3. In another terminal, pull a model: ollama pull mistral")
-        sys.exit(1)
     
     if os.path.isfile(input_path):
         analyzer.process_file(input_path, output_file)

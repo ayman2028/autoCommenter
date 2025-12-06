@@ -37,6 +37,8 @@ class Config:
             "model": "mistral",
             "temperature": 0.3,
             "max_tokens": 2000,
+            "cloud_api_key": "",
+            "cloud_model": "gpt-3.5-turbo",
             "supported_extensions": [
                 ".py",
                 ".js",
@@ -49,9 +51,9 @@ class Config:
                 ".rb"
             ],
             "notes": [
-                "LLM Provider options: 'ollama' or 'llamacpp'",
-                "For Ollama: https://ollama.ai",
-                "For LLaMA.cpp: https://github.com/ggerganov/llama.cpp",
+                "Priority: Local LLM (Ollama) > Cloud API",
+                "For local: Install Ollama from https://ollama.ai",
+                "For cloud: Add your OpenAI API key to 'cloud_api_key'",
                 "Available Ollama models: mistral, llama2, neural-chat, etc.",
                 "Pull a model with: ollama pull mistral"
             ]
@@ -90,6 +92,14 @@ class Config:
     def get_llm_provider(self) -> str:
         """Get LLM provider type."""
         return self.config.get('llm_provider', 'ollama')
+    
+    def get_cloud_api_key(self) -> str:
+        """Get cloud API key (OpenAI, etc.)."""
+        return self.config.get('cloud_api_key', '').strip()
+    
+    def get_cloud_model(self) -> str:
+        """Get cloud model name."""
+        return self.config.get('cloud_model', 'gpt-3.5-turbo')
     
     def set_model(self, model: str) -> bool:
         """Set model name and save to config."""
