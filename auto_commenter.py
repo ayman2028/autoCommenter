@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional, List, Dict
 import requests
 import json
+import subprocess
 from config import Config
 
 
@@ -28,6 +29,56 @@ class LocalLLMAnalyzer:
         'default': 1,
     }
     
+    @staticmethod
+    def detect_gpu() -> Dict[str, any]:
+        """Detect available GPU and return GPU info."""
+        gpu_info = {
+            'has_gpu': False,
+            'gpu_type': None,
+            'gpu_count': 0,
+            'use_gpu': False,
+        }
+        
+        try:
+            # Check for NVIDIA GPU
+            result = subprocess.run(['nvidia-smi', '--list-gpus'], 
+                                  capture_output=True, 
+                                  text=True, 
+                                  timeout=5)
+            if result.returncode == 0:
+                gpu_count = len(result.stdout.strip().split('\n'))
+                gpu_info['has_gpu'] = True
+                gpu_info['gpu_type'] = 'NVIDIA'
+                gpu_info['gpu_count'] = gpu_count
+                gpu_info['use_gpu'] = True
+                print(f"✓ Detected {gpu_count} NVIDIA GPU(s)")
+                return gpu_info
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        
+        try:
+            # Check for AMD GPU (ROCm)
+            result = subprocess.run(['rocm-smi', '--showid'], 
+                                  capture_output=True, 
+                                  text=True, 
+                                  timeout=5)
+            if result.returncode == 0:
+                gpu_count = len([line for line in result.stdout.split('\n') 
+                               if 'GPU' in line and line.strip()])
+                gpu_info['has_gpu'] = True
+                gpu_info['gpu_type'] = 'AMD (ROCm)'
+                gpu_info['gpu_count'] = gpu_count
+                gpu_info['use_gpu'] = True
+                print(f"✓ Detected {gpu_count} AMD GPU(s) with ROCm")
+                return gpu_info
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        
+        if not gpu_info['has_gpu']:
+            print("ℹ No GPU detected, using CPU (this will be slower)")
+        
+        return gpu_info
+    
     def __init__(self, config: Config):
         """Initialize the code analyzer with local LLM configuration."""
         self.config = config
@@ -35,6 +86,9 @@ class LocalLLMAnalyzer:
         self.available_models = []
         self.model = None
         self.use_local = True
+        
+        # Detect GPU availability
+        self.gpu_info = self.detect_gpu()
         
         # Try local LLM first
         if self.verify_connection():
@@ -190,15 +244,24 @@ Rules:
 
 Return ONLY the commented code, nothing else. Do not add markdown formatting or code blocks."""
 
+            # Build request payload
+            payload = {
+                "model": self.model,
+                "prompt": prompt,
+                "stream": False,
+                "temperature": self.config.get_temperature(),
+                "num_predict": self.config.get_max_tokens(),
+            }
+            
+            # Add GPU parameters if GPU is available
+            if self.gpu_info['use_gpu']:
+                payload["gpu"] = True
+                if self.gpu_info['gpu_count'] > 0:
+                    payload["num_gpu"] = self.gpu_info['gpu_count']
+
             response = requests.post(
                 f"{self.api_endpoint}/api/generate",
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "temperature": self.config.get_temperature(),
-                    "num_predict": self.config.get_max_tokens(),
-                },
+                json=payload,
                 timeout=300  # 5 minutes timeout for local processing
             )
             
