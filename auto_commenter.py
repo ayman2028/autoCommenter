@@ -226,16 +226,41 @@ class LocalLLMAnalyzer:
     def _generate_local(self, code: str, language: str) -> str:
         """Generate comments using local LLM via Ollama."""
         try:
-            prompt = f"""You are an expert code commenter. Your task is to add helpful comments to the following {language} code.
+            prompt = f"""You are an expert software engineer and code documentation specialist. Your task is to add comprehensive, detailed comments to the following {language} code.
 
-Rules:
-1. Add comments above functions, classes, and complex logic blocks
-2. Explain the purpose and parameters of functions
-3. Keep comments concise but informative
-4. Use single-line comments for simple statements
-5. Use multi-line comments for complex sections
-6. Don't over-comment obvious code
-7. Preserve the original code structure exactly
+Rules for Detailed Commenting:
+1. Add a detailed docstring/comment block above each function and class explaining:
+   - What it does (purpose and functionality)
+   - All parameters (name, type, purpose, constraints)
+   - Return value (type, meaning, possible values)
+   - Possible exceptions or edge cases
+   - Example usage if helpful
+
+2. For complex logic blocks:
+   - Explain the algorithm or approach being used
+   - Break down multi-step operations
+   - Clarify the reasoning behind non-obvious code
+   - Explain any performance considerations
+
+3. For variables and data structures:
+   - Explain the purpose of important variables
+   - Document the structure of complex data types
+   - Clarify units of measurement when relevant
+
+4. For conditionals and loops:
+   - Explain what condition is being checked and why
+   - Document loop invariants and termination conditions
+   - Clarify edge cases being handled
+
+5. Style guidelines:
+   - Use clear, professional language
+   - Be thorough but avoid redundancy
+   - Maintain proper indentation
+   - Use appropriate comment syntax for {language}
+   - Add inline comments for tricky one-liners
+   - Don't comment obvious code (like `i += 1`)
+
+6. Preserve the original code structure exactly - only add comments
 
 {language} Code to comment:
 ```
@@ -288,7 +313,12 @@ Return ONLY the commented code, nothing else. Do not add markdown formatting or 
             
             openai.api_key = api_key
             
-            prompt = f"""You are an expert code commenter. Add helpful comments to this {language} code:
+            prompt = f"""You are an expert software engineer and code documentation specialist. Add comprehensive, detailed comments to this {language} code.
+
+For each function/class: explain purpose, parameters (with types), return values, and edge cases.
+For complex logic: explain the algorithm, reasoning, and any performance considerations.
+For important variables: document their purpose and structure.
+Be thorough but professional. Preserve the original code structure exactly.
 
 {code}
 

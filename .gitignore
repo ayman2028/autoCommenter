@@ -23,6 +23,12 @@ Pipfile.lock
 
 # Project specific
 config.json
+*_commented.py
+*_commented.js
+*_commented.ts
+*_commented.java
+*_commented.cpp
+*_commented.*
 example_commented.py
 training_data/
 checkpoints/
@@ -30,4 +36,6 @@ training_logs/
 
 # OS
 .DS_Store
+._.DS_Store
 Thumbs.db
+._*

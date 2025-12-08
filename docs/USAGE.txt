@@ -1,0 +1,94 @@
+AUTO COMMENTER - QUICK USAGE GUIDE
+===================================
+
+STEP 1: Start Ollama
+--------------------
+Open the Ollama desktop app from Applications
+OR run in terminal:
+  ollama serve
+
+
+STEP 2: Run the Auto Commenter
+-------------------------------
+cd "/Volumes/T9/Backend projects/autoCommenter"
+pipenv run python auto_commenter.py YOUR_FILE.py
+
+
+EXAMPLES
+--------
+
+Comment a single Python file:
+  pipenv run python auto_commenter.py example.py
+
+Comment a JavaScript file:
+  pipenv run python auto_commenter.py script.js
+
+Comment a file with custom output name:
+  pipenv run python auto_commenter.py mycode.py -o mycode_with_comments.py
+
+
+OUTPUT
+------
+Creates a new file: YOUR_FILE_commented.py
+Original file is never modified.
+
+
+STOP OLLAMA
+-----------
+Quit the Ollama app from menu bar
+OR in terminal:
+  killall ollama
+
+
+WORKING WITH OLLAMA MODELS
+===========================
+
+List installed models:
+  ollama list
+
+Download a new model:
+  ollama pull mistral
+  ollama pull llama3.1:8b
+  ollama pull deepseek-coder:6.7b
+  ollama pull codellama:7b
+
+Delete a model to free space:
+  ollama rm mistral
+
+Test a model interactively:
+  ollama run llama3.1
+
+
+CHOOSING WHICH MODEL TO USE
+----------------------------
+
+The auto commenter automatically selects the most powerful model.
+Model priority (best to worst):
+  1. dolphin-mixtral
+  2. dolphin2.2-mistral
+  3. mistral
+  4. llama2
+  5. neural-chat
+
+To manually set a specific model:
+  1. Open: config.json
+  2. Change the "model" field:
+     "model": "llama3.1:8b"
+  3. Save and run normally
+
+
+RECOMMENDED MODELS FOR 16GB RAM
+--------------------------------
+deepseek-coder:6.7b  - Best for code (~4GB)
+llama3.1:8b          - Best all-around (~5GB)
+codellama:7b         - Good for code (~4GB)
+mistral              - Fast and capable (~4GB)
+
+
+WHERE ARE MODELS STORED?
+-------------------------
+All models are stored on T9 drive:
+  /Volumes/T9/ollama/models/
+
+Check storage used:
+  du -sh "/Volumes/T9/ollama/models"
